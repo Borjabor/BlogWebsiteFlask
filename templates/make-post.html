@@ -1,0 +1,124 @@
+{% block content %} {% include "header.html" %}
+{% from 'bootstrap5/form.html' import render_form %}
+
+{{ ckeditor.load() }}
+{{ ckeditor.config(name='body') }}
+
+{% block script %}
+<script src="https://cdn.ckeditor.com/4.25.0/standard/ckeditor.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+{% endblock %}
+
+<!-- Page Header -->
+<header
+  class="masthead"
+  style="background-image: url('../static/assets/img/edit-bg.jpg')"
+>
+  <div class="container position-relative px-4 px-lg-5">
+    <div class="row gx-4 gx-lg-5 justify-content-center">
+      <div class="col-md-10 col-lg-8 col-xl-7">
+        <div class="page-heading">
+          {% if is_edit %}
+          <h1>Editing Post</h1>
+          <span class="subheading"
+            >What would you like to change?</span
+          >
+          {% else %}
+          <h1>New Post</h1>
+          <span class="subheading"
+            >You're going to make a great blog post!</span
+          >
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="mb-4">
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+        <form method="POST" enctype="multipart/form-data">
+          <!--{{ render_form(form) }}-->
+          {{ form.hidden_tag() }}
+    
+          {{ form.title.label }}
+          {{ form.title(class="form-control") }}
+          
+          {{ form.subtitle.label }}
+          {{ form.subtitle(class="form-control") }}
+          
+          {{ form.author.label }}
+          {{ form.author(class="form-control") }}
+          
+          <div class="form-group">
+            {{ form.image.label }}
+            <div class="input-group">
+                <input type="text" class="form-control" name="image-url" placeholder="Enter image URL">
+                <div class="input-group-append">
+                    <span class="input-group-text">or
+                </div>
+                {{ form.image(class="form-control") }}
+            </div>
+            <small class="form-text text-muted">Enter a URL or select a file to upload.</small>
+          </div>
+        
+          
+          {{ form.body.label }}
+          {{ form.body(class="form-control") }}
+          
+          {{ form.submit(class="btn btn-primary") }}
+        </form>      
+      </div>
+    </div>
+  </div>
+</main>
+
+<!--<script>
+  CKEDITOR.replace('body', {
+    filebrowserUploadUrl: "/upload?CKEditorFuncNum=1",
+    filebrowserUploadMethod: 'form'
+  });
+</script>-->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    if (typeof CKEDITOR !== 'undefined' && !CKEDITOR.instances['body']) {
+      CKEDITOR.replace('body', {
+        filebrowserUploadUrl: "/upload?CKEditorFuncNum=1",
+        filebrowserUploadMethod: 'form'
+      });
+    } else if (CKEDITOR.instances['body']) {
+      CKEDITOR.instances['body'].destroy();
+      CKEDITOR.replace('body', {
+        filebrowserUploadUrl: "/upload?CKEditorFuncNum=1",
+        filebrowserUploadMethod: 'form'
+      });
+    }
+  });
+</script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+      var urlInput = document.querySelector('input[name="image-url"]');
+      var fileInput = document.querySelector('input[name="image"]');
+  
+      urlInput.addEventListener('input', function() {
+          if (this.value) {
+              fileInput.disabled = true;
+          } else {
+              fileInput.disabled = false;
+          }
+      });
+  
+      fileInput.addEventListener('change', function() {
+          if (this.files.length > 0) {
+              urlInput.disabled = true;
+          } else {
+              urlInput.disabled = false;
+          }
+      });
+    });
+  </script>
+
+
+{% include "footer.html" %} {% endblock %}
