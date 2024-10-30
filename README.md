@@ -2,6 +2,7 @@
 =========================
 
 A RESTful Flask application for a blog website, allowing users to view, edit, delete, and create new posts with image support.
+The pages are not fully configured and populated yet, but the main functionalities are already in place.
 
 ## Features
 
