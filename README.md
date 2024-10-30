@@ -10,12 +10,12 @@ A RESTful Flask application for a blog website, allowing users to view, edit, de
 * Delete posts
 * Create new posts with image upload (URL or local file)
 * RESTful API architecture
-
-## Requirements
-
-* Python 3.x
-* Flask
-* [List any other dependencies required by your app]
+* Possible to create users with hashed and salted passwords
+* Users have 3 roles: user, admin, and maintainer
+  	+ Users can comment on posts
+  	+ Admins can also create, edit, and delete posts, as well as delete user comments
+  	+ Maintainer can to the same as Admins, plus grant or revoke Admin status, and delete Users
+  
 
 ## Installation
 
@@ -34,17 +34,55 @@ A RESTful Flask application for a blog website, allowing users to view, edit, de
 ## Image Upload
 
 * Images can be uploaded from a URL or a local file
-* [Provide any additional details about image upload, such as supported formats or size limits]
+* Accepted formats: png, jpg, jpeg, gif
 
 ## Database Schema
 
 The project uses a SQLite database with the following schema:
 
-* `blog_post` table:
-	+ `id` (primary key)
-	+ `title`
-	+ `date`
-	+ `body`
-	+ `author`
-	+ `img_url`
-	+ `subtitle`
+### Users Table
+
+| Column Name | Data Type | Constraints |
+|-------------|-----------|-------------|
+| id          | Integer   | Primary Key, Auto Increment |
+| name        | String    | Not Null |
+| email       | String    | Unique, Not Null |
+| password    | String    | Not Null |
+| role        | Integer   | Not Null, Default: 1 (USER) |
+
+### Blog Posts Table
+
+| Column Name | Data Type | Constraints |
+|-------------|-----------|-------------|
+| id          | Integer   | Primary Key, Auto Increment |
+| title       | String    | Not Null |
+| subtitle    | String    | Not Null |
+| date        | DateTime  | Not Null |
+| body        | Text      | Not Null |
+| author_id   | Integer   | Foreign Key (users.id) |
+| img_url     | String    | Not Null |
+
+### Comments Table
+
+| Column Name | Data Type | Constraints |
+|-------------|-----------|-------------|
+| id          | Integer   | Primary Key, Auto Increment |
+| text        | Text      | Not Null |
+| author_id   | Integer   | Foreign Key (users.id) |
+| post_id     | Integer   | Foreign Key (blog_posts.id) |
+| date        | DateTime  | Not Null |
+
+### Relationships
+
+- A User can have many Blog Posts (One-to-Many)
+- A User can have many Comments (One-to-Many)
+- A Blog Post can have many Comments (One-to-Many)
+
+### Role Enumeration
+
+| Role Value | Role Name  |
+|------------|------------|
+| 1          | USER       |
+| 2          | ADMIN      |
+| 3          | MAINTAINER |
+
