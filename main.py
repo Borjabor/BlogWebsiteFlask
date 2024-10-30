@@ -97,7 +97,7 @@ def create_maintainer(app):
         if not maintainer:
             maintainer = User(
                 name="Admin User",
-                email="andreborjamiranda@gmail.com",
+                email="maintainer@email.com",
                 password=generate_password_hash("your_secure_password"),
                 role="maintainer"
             )
