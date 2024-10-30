@@ -23,6 +23,13 @@ A RESTful Flask application for a blog website, allowing users to view, edit, de
 2. Install dependencies: `pip install -r requirements.txt`
 3. Run the application: `flask run`
 
+## Environment Variables
+Some variables are shown in the code for ease of testing, but for security reasons they should be made hidden by use of environment variables
+* SECRET KEY
+* Maintainer user credentials:
+    + Email
+    + Password
+
 ## API Endpoints
 
 * `GET /posts`: Retrieve a list of all posts
