@@ -27,13 +27,14 @@
           <h2 class="post-title">{{ post.title }}</h2>
           <h3 class="post-subtitle">{{ post.subtitle }}</h3>
         </a>
-        <!-- TODO: Add code to delete posts below -->
         <p class="post-meta">
           Posted by
-          <a href="#">{{post.author}}</a>
+          <a href="#">{{post.author.name}}</a>
           on {{post.date}}
-          <a href="{{url_for('delete_post', post_id=post.id)}}" 
+          {% if current_user.is_authenticated and current_user.role in ['admin', 'maintainer'] %}
+          <a href="{{url_for('delete_post', post_id=post.id, is_post=1)}}" 
              onclick="return confirm('Are you sure you want to delete this post?');">✘</a>
+          {% endif %}
         </p>
       </div>
       <!-- Divider-->
@@ -41,6 +42,7 @@
       {% endfor %}
 
       <!-- New Post -->
+      {% if current_user.is_authenticated and current_user.role in ['admin', 'maintainer'] %}
       <div class="d-flex justify-content-end mb-4">
         <a
           class="btn btn-primary float-right"
@@ -48,11 +50,17 @@
           >Create New Post</a
         >
       </div>
+      {% endif %}
 
-      <!-- Pager-->
+      {% if current_user.is_authenticated and current_user.role == 'maintainer' %}
       <div class="d-flex justify-content-end mb-4">
-        <a class="btn btn-secondary text-uppercase" href="#!">Older Posts →</a>
+        <a
+          class="btn btn-secondary float-right"
+          href="{{url_for('manage_users')}}"
+          >Manage Users</a
+        >
       </div>
+      {% endif %}
     </div>
   </div>
 </div>

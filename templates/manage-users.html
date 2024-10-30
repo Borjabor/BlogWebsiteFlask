@@ -1,0 +1,41 @@
+{% include "header.html" %}
+<header
+  style="background-image: url('../static/assets/img/home-bg.jpg')">
+  <div class="p-4 text-center bg-body-tertiary">
+    <h1 class="p-2 mb-2"></h1>
+  </div>
+</header>
+
+<h1>Manage Users</h1>
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for user in users %}
+        {% if user.role != 'maintainer' %}
+        <tr>
+            <td>{{ user.id }}</td>
+            <td>{{ user.name }}</td>
+            <td>{{ user.email }}</td>
+            <td>{{ user.role }}</td>
+            <td>
+                {% if user.role == 'admin' %}
+                    <a href="{{ url_for('toggle_admin', user_id=user.id) }}" class="btn btn-warning btn-sm">Revoke Admin</a>
+                {% else %}
+                    <a href="{{ url_for('toggle_admin', user_id=user.id) }}" class="btn btn-success btn-sm">Make Admin</a>
+                {% endif %}
+                <a href="{{ url_for('remove_user', user_id=user.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to remove this user?');">Remove User</a>
+            </td>
+        </tr>
+        {% endif %}
+    {% endfor %}
+    </tbody>
+</table>
+{% include "footer.html" %}

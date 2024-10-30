@@ -1,17 +1,22 @@
-from flask import Flask, render_template, redirect, url_for, request, send_from_directory, jsonify
+from flask import Flask, flash, render_template, redirect, url_for, request, send_from_directory, jsonify, abort
+from functools import wraps
 from flask_bootstrap import Bootstrap5
+from flask_ckeditor import CKEditor, CKEditorField
+from flask_gravatar import Gravatar
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import Integer, String, Text
+from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed, FileRequired
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import Integer, String, Text
 from wtforms import StringField, SubmitField
 from wtforms.widgets import FileInput
 from wtforms.validators import DataRequired, URL, Optional
-from flask_ckeditor import CKEditor, CKEditorField
+from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import date
 import os
+from forms import *
 
 
 
@@ -24,66 +29,221 @@ app.config['CKEDITOR_SERVE_LOCAL'] = False
 app.config['CKEDITOR_PKG_TYPE'] = 'standard'
 
 ckeditor = CKEditor(app)
-
 Bootstrap5(app)
+
+
+login_manager = LoginManager()
+login_manager.init_app(app)
 
 class Base(DeclarativeBase):
     pass
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///posts.db'
+
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance/blog.db')
 db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 
+gravatar = Gravatar(
+    app,
+    size=100,
+    rating='g',
+    default='retro',
+    force_default=False,
+    force_lower=False,
+    use_ssl=False,
+    base_url=None
+)
 
-class FileOrURLField(FileField):
-    def __init__(self, *args, **kwargs):
-        super(FileOrURLField, self).__init__(*args, **kwargs)
-        self.url = StringField()
-
-    def process_formdata(self, valuelist):
-        if valuelist:
-            if isinstance(valuelist[0], str):
-                self.data = valuelist[0]
-            else:
-                super(FileOrURLField, self).process_formdata(valuelist)
-
-
+# region Database Tables
+class User(UserMixin, db.Model):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(500))
+    email: Mapped[str] = mapped_column(String(100), unique=True)
+    password: Mapped[str] = mapped_column(String(100))
+    role: Mapped[str] = mapped_column(String(20), default='user')
+    posts = relationship('BlogPost', back_populates='author')
+    comments = relationship('Comment', back_populates='comment_author')
 
 class BlogPost(db.Model):
+    __tablename__ = "blog_posts"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(250), unique=True, nullable=False)
     subtitle: Mapped[str] = mapped_column(String(250), nullable=False)
     date: Mapped[str] = mapped_column(String(250), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
-    author: Mapped[str] = mapped_column(String(250), nullable=False)
     img_url: Mapped[str] = mapped_column(String(250), nullable=False)
+    author_id: Mapped[int] = mapped_column(Integer, db.ForeignKey('users.id'), nullable=False)
+    author: Mapped[User] = relationship('User', back_populates='posts')
+    comments = relationship('Comment', back_populates='parent_post')
 
-class BlogPostForm(FlaskForm):
-    title = StringField("Blog Post Title", validators=[DataRequired()])
-    subtitle = StringField("Subtitle", validators=[DataRequired()])
-    author = StringField("Your Name", validators=[DataRequired()])
-    # img_url = StringField("Blog Image URL", validators=[Optional(), URL()])
-    # img_file = FileField("Blog Image (Takes priority over URL if both are provided)", validators=[FileAllowed(['jpg', 'png', 'jpeg', 'gif'], 'Images only!')])
-    image = FileOrURLField("Blog Image (URL or File)", validators=[Optional()])
-    body = CKEditorField("Blog Content", validators=[DataRequired()])
-    submit = SubmitField("Submit Post")
-
+class Comment(db.Model):
+    __tablename__ = "comments"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    author_id: Mapped[int] = mapped_column(Integer, db.ForeignKey('users.id'), nullable=False)
+    comment_author: Mapped[User] = relationship('User', back_populates='comments')
+    post_id: Mapped[int] = mapped_column(Integer, db.ForeignKey('blog_posts.id'), nullable=False)
+    parent_post: Mapped[BlogPost] = relationship('BlogPost', back_populates='comments')
+# endregion
 
 with app.app_context():
     db.create_all()
+    
+# Creates a maintainer user automatically if there is none
+def create_maintainer(app):
+    with app.app_context():
+        maintainer = User.query.filter_by(role='maintainer').first()
+        if not maintainer:
+            maintainer = User(
+                name="Admin User",
+                email="andreborjamiranda@gmail.com",
+                password=generate_password_hash("your_secure_password"),
+                role="maintainer"
+            )
+            db.session.add(maintainer)
+            db.session.commit()
+            print("Maintainer user created")
 
+create_maintainer(app)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def role_required(min_role):
+    """
+    A decorator that checks if the user has the required role to access specific functionality
+
+    The decorator takes a single argument, `min_role`, which is the minimum role
+    required to access the route. If the user's role is not high enough, 
+    it will return a 403 error.
+
+    The role permissions are defined as follows:
+    - user: can comment on posts
+    - admin: same as user, plus can add, edit, and delete posts, and delete comments
+    - maintainer: same as admin, plus can delete users, as well give and revoke admin status
+
+    The decorator can be used as follows:
+    @app.route('/admin_only')
+    @role_required('admin')
+    def admin_only():
+        # Code here
+        pass
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return abort(403)
+            role_hierarchy = {'user': 0, 'admin': 1, 'maintainer': 2}
+            if role_hierarchy.get(current_user.role, -1) < role_hierarchy.get(min_role, float('inf')):
+                return abort(403)
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    form = RegisterForm()
+    if form.validate_on_submit():
+        if User.query.filter_by(email=form.email.data).first():
+            flash("You've already signed up with that email, log in instead!")
+            return redirect(url_for('login'))
+        
+        hash_and_salted_password = generate_password_hash(
+            form.password.data,
+            method='pbkdf2:sha256',
+            salt_length=8
+        )
+        new_user = User(
+            email=form.email.data,
+            name=form.name.data,
+            password=hash_and_salted_password,
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        login_user(new_user)
+        return redirect(url_for("get_all_posts"))
+    return render_template("register.html", form=form)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    form = LoginForm()
+    if form.validate_on_submit():
+        email = form.email.data
+        password = form.password.data
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            flash("That email does not exist, please try again.")
+            return redirect(url_for('login'))
+        elif not check_password_hash(user.password, password):
+            flash('Password incorrect, please try again.')
+            return redirect(url_for('login'))
+        else:
+            login_user(user)
+            return redirect(url_for('get_all_posts'))
+    return render_template("login.html", form=form)
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('get_all_posts'))
 
 @app.route('/')
 def get_all_posts():
     posts = db.session.query(BlogPost).all()
     return render_template("index.html", all_posts=posts)
 
-@app.route('/post/<int:post_id>')
+@app.route('/post/<int:post_id>', methods=['GET', 'POST'])
 def show_post(post_id):
-    requested_post = db.session.execute(db.select(BlogPost).filter_by(id=post_id)).scalar()
-    return render_template("post.html", post=requested_post)
+    comment_form = CommentForm()
+    requested_post = db.get_or_404(BlogPost, post_id)
+    if comment_form.validate_on_submit():
+        if not current_user.is_authenticated:
+            flash("You need to login or register to comment.")
+            return redirect(url_for('login'))
+        new_comment = Comment(
+            text=comment_form.comment_text.data,
+            comment_author=current_user,
+            parent_post=requested_post
+        )
+        db.session.add(new_comment)
+        db.session.commit()
+        return redirect(url_for("show_post", post_id=post_id))
+    return render_template("post.html", post=requested_post, form=comment_form)
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+@app.route('/manage-users')
+@login_required
+@role_required('maintainer')
+def manage_users():
+    users = User.query.all()
+    return render_template("manage-users.html", users=users)
+
+@app.route('/toggle-admin/<int:user_id>')
+@login_required
+@role_required('maintainer')
+def toggle_admin(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.role == 'admin':
+        user.role = 'user'
+    else:
+        user.role = 'admin'
+    db.session.commit()
+    return redirect(url_for('manage_users'))
+
+@app.route('/remove-user/<int:user_id>')
+@login_required
+@role_required('maintainer')
+def remove_user(user_id):
+    user = User.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    return redirect(url_for('manage_users'))
+
 
 @app.route('/upload', methods=['POST'])
 def upload_image():
@@ -107,11 +267,11 @@ def upload_image():
     
     return jsonify({'uploaded': 0, 'error': {'message': 'Invalid file type'}})
 
-
-
 @app.route('/new-post', methods=['GET', 'POST'])
+@login_required
+@role_required('admin')
 def add_new_post():
-    form = BlogPostForm()
+    form = CreatePostForm()
     if form.validate_on_submit():
         image_url = request.form.get('image-url')
         image_file = form.image.data
@@ -124,21 +284,13 @@ def add_new_post():
             img_url = url_for('static', filename=f'assets/img/{filename}')
         else:
             img_url = None
-        # if form.img_file.data:
-        #     image_file = form.img_file.data
-        #     filename = secure_filename(image_file.filename)
-        #     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        #     image_file.save(file_path)
-        #     image_url = url_for('static', filename=f'assets/img/{filename}')
-        # else:
-        #     image_url = form.img_url.data 
             
         new_post = BlogPost(
             title=form.title.data,
             subtitle=form.subtitle.data,
             body=form.body.data,
             img_url=img_url,
-            author=form.author.data,
+            author=current_user,
             date=date.today().strftime("%B %d, %Y")
         )
         db.session.add(new_post)
@@ -147,12 +299,13 @@ def add_new_post():
     return render_template("make-post.html", form=form)
 
 @app.route('/edit-post/<int:post_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('admin')
 def edit_post(post_id):
     post = db.session.execute(db.select(BlogPost).filter_by(id=post_id)).scalar()
-    edit_form = BlogPostForm(
+    edit_form = CreatePostForm(
         title=post.title,
         subtitle=post.subtitle,
-        author=post.author,
         img_url=post.img_url,
         body=post.body
     )
@@ -166,7 +319,6 @@ def edit_post(post_id):
 
         post.title = edit_form.title.data
         post.subtitle = edit_form.subtitle.data
-        post.author = edit_form.author.data
         post.body = edit_form.body.data
 
         db.session.commit()
@@ -174,14 +326,19 @@ def edit_post(post_id):
 
     return render_template("make-post.html", form=edit_form, is_edit=True)
 
-@app.route('/delete/<int:post_id>')
-def delete_post(post_id):
-    post_to_delete = db.session.execute(db.select(BlogPost).filter_by(id=post_id)).scalar()
-    db.session.delete(post_to_delete)
+@app.route('/delete/<int:post_id>/<int:is_post>')
+@login_required
+@role_required('admin')
+def delete_post(post_id, is_post):
+    item = BlogPost if is_post else Comment
+    item_to_delete = db.session.execute(db.select(item).filter_by(id=post_id)).scalar()
+    db.session.delete(item_to_delete)
     db.session.commit()
-    return redirect(url_for('get_all_posts'))
+    if is_post:
+        return redirect(url_for('get_all_posts'))
+    else:
+        return redirect(url_for('show_post', post_id=item_to_delete.post_id))
 
-# Below is the code from previous lessons. No changes needed.
 @app.route("/about")
 def about():
     return render_template("about.html")
