@@ -16,6 +16,7 @@ The pages are not fully configured and populated yet, but the main functionaliti
   	+ Users can comment on posts
   	+ Admins can also create, edit, and delete posts, as well as delete user comments
   	+ Maintainer can to the same as Admins, plus grant or revoke Admin status, and delete Users
+  	+ To create maintainer users run `flask create-maintainer` command in the terminal
   
 
 ## Installation
@@ -23,13 +24,7 @@ The pages are not fully configured and populated yet, but the main functionaliti
 1. Clone the repository: `git clone https://github.com/your-username/your-repo-name.git`
 2. Install dependencies: `pip install -r requirements.txt`
 3. Run the application: `flask run`
-
-## Environment Variables
-Some variables are shown in the code for ease of testing, but for security reasons they should be made hidden by use of environment variables
-* SECRET KEY
-* Maintainer user credentials:
-    + Email
-    + Password
+   
 
 ## API Endpoints
 
