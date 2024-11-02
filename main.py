@@ -1,32 +1,29 @@
-from flask import Flask, flash, render_template, redirect, url_for, request, send_from_directory, jsonify, abort
+from flask import Flask, flash, render_template, redirect, url_for, request, jsonify, abort
 from functools import wraps
 from flask_bootstrap import Bootstrap5
-from flask_ckeditor import CKEditor, CKEditorField
+from flask_ckeditor import CKEditor
 from flask_gravatar import Gravatar
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from flask_wtf import FlaskForm
-from flask_wtf.file import FileField, FileAllowed, FileRequired
+from getpass import getpass
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy import Integer, String, Text
-from wtforms import StringField, SubmitField
-from wtforms.widgets import FileInput
-from wtforms.validators import DataRequired, URL, Optional
+from sqlalchemy import Integer, String, Text, DateTime
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import date
+from dotenv import load_dotenv
 import os
 from forms import *
 
 
-
+load_dotenv()
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
-app.config['UPLOAD_FOLDER'] = './static/assets/img'
+app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-app.config['CKEDITOR_SERVE_LOCAL'] = False
-app.config['CKEDITOR_PKG_TYPE'] = 'standard'
+app.config['CKEDITOR_SERVE_LOCAL'] = os.getenv('CKEDITOR_SERVE_LOCAL') == 'True'
+app.config['CKEDITOR_PKG_TYPE'] = os.getenv('CKEDITOR_PKG_TYPE')
 
 ckeditor = CKEditor(app)
 Bootstrap5(app)
@@ -38,8 +35,7 @@ login_manager.init_app(app)
 class Base(DeclarativeBase):
     pass
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance/blog.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 
@@ -70,7 +66,7 @@ class BlogPost(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(250), unique=True, nullable=False)
     subtitle: Mapped[str] = mapped_column(String(250), nullable=False)
-    date: Mapped[str] = mapped_column(String(250), nullable=False)
+    date: Mapped[str] = mapped_column(DateTime, nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     img_url: Mapped[str] = mapped_column(String(250), nullable=False)
     author_id: Mapped[int] = mapped_column(Integer, db.ForeignKey('users.id'), nullable=False)
@@ -90,22 +86,22 @@ class Comment(db.Model):
 with app.app_context():
     db.create_all()
     
-# Creates a maintainer user automatically if there is none
-def create_maintainer(app):
-    with app.app_context():
-        maintainer = User.query.filter_by(role='maintainer').first()
-        if not maintainer:
-            maintainer = User(
-                name="Admin User",
-                email="maintainer@email.com",
-                password=generate_password_hash("your_secure_password"),
-                role="maintainer"
-            )
-            db.session.add(maintainer)
-            db.session.commit()
-            print("Maintainer user created")
+# Flask-CLI command to create a maintainer with chosen credentials
+@app.cli.command("create-maintainer")
+def create_maintainer_command():
+    email = input("Enter maintainer email: ")
+    password = getpass("Enter maintainer password: ")
+    name = input("Enter maintainer name: ")
+    maintainer = User(
+    name=name,
+    email=email,
+    password=generate_password_hash(password),
+    role="maintainer"
+    )
+    db.session.add(maintainer)
+    db.session.commit()
+    print("Maintainer user created")
 
-create_maintainer(app)
 
 @login_manager.user_loader
 def load_user(user_id):

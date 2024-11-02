@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField
 from wtforms import StringField, SubmitField, PasswordField
-from wtforms.validators import DataRequired, URL, Optional
+from wtforms.validators import DataRequired, Optional
 from flask_ckeditor import CKEditorField
 
 class FileOrURLField(FileField):
