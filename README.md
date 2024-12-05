@@ -16,7 +16,7 @@ The pages are not fully configured and populated yet, but the main functionaliti
   	+ Users can comment on posts
   	+ Admins can also create, edit, and delete posts, as well as delete user comments
   	+ Maintainer can to the same as Admins, plus grant or revoke Admin status, and delete Users
-  	+ To create maintainer users run `flask create-maintainer` command in the terminal
+  	+ To create maintainer users run `flask create-maintainer` command in the terminal (or `flask --app main.py create-maintainer` for the full command)
   
 
 ## Installation

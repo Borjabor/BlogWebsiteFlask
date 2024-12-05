@@ -35,7 +35,8 @@ login_manager.init_app(app)
 class Base(DeclarativeBase):
     pass
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(basedir, os.getenv("DB_URI"))}'
 db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 
@@ -83,9 +84,19 @@ class Comment(db.Model):
     parent_post: Mapped[BlogPost] = relationship('BlogPost', back_populates='comments')
 # endregion
 
+instance_path = os.path.join(basedir, 'instance')
+if not os.path.exists(instance_path):
+    os.makedirs(instance_path)
+
 with app.app_context():
-    db.create_all()
-    
+    try:
+        db.create_all()
+        print("Database created successfully!")
+    except Exception as e:
+        print(f"Error creating database: {e}")
+        print(f"Current working directory: {os.getcwd()}")
+        print(f"Database path: {app.config['SQLALCHEMY_DATABASE_URI']}")
+
 # Flask-CLI command to create a maintainer with chosen credentials
 @app.cli.command("create-maintainer")
 def create_maintainer_command():
