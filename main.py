@@ -36,7 +36,10 @@ class Base(DeclarativeBase):
     pass
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DB_URI', f'sqlite:///{os.path.join(basedir, os.getenv("DB_URI"))}')
+instance_path = os.path.join(basedir, 'instance')
+if not os.path.exists(instance_path):
+    os.makedirs(instance_path)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DB_URI', f'sqlite:///{os.path.join(instance_path, 'blog.db')}')
 db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 
@@ -84,9 +87,6 @@ class Comment(db.Model):
     parent_post: Mapped[BlogPost] = relationship('BlogPost', back_populates='comments')
 # endregion
 
-instance_path = os.path.join(basedir, 'instance')
-if not os.path.exists(instance_path):
-    os.makedirs(instance_path)
 
 with app.app_context():
     try:
