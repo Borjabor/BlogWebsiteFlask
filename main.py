@@ -14,8 +14,7 @@ from datetime import date
 from dotenv import load_dotenv
 import os
 from forms import *
-
-
+   
 load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
@@ -39,7 +38,8 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 instance_path = os.path.join(basedir, 'instance')
 if not os.path.exists(instance_path):
     os.makedirs(instance_path)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DB_URI', f'sqlite:///{instance_path}/blog.db')
+#app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DB_URI', f'sqlite:///{instance_path}/blog.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{instance_path}/blog.db'
 db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 

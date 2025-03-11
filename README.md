@@ -24,6 +24,10 @@ The pages are not fully configured and populated yet, but the main functionaliti
 1. Clone the repository: `git clone https://github.com/your-username/your-repo-name.git`
 2. Install dependencies: `pip install -r requirements.txt`
 3. Run the application: `flask run`
+
+## Setup of .env
+
+I included a .env.example file to help you set up your .env file.
    
 
 ## API Endpoints
