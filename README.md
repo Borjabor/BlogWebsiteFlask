@@ -27,7 +27,7 @@ The pages are not fully configured and populated yet, but the main functionaliti
 
 ## Setup of .env
 
-I included a .env.example file to help you set up your .env file.
+I included a .env.example file to help you set up your .env file. Copy those variables to your .env file and fill in the values.
    
 
 ## API Endpoints
